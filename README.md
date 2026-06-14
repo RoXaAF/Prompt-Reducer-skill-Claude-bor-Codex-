@@ -5,7 +5,7 @@ A tiny shorthand syntax for talking to Claude, Codex, and ChatGPT that cuts
 your **input tokens by 40–75%** on iterative coding/writing sessions, without
 losing output quality.
 
-It doesn't make the model smarter — it removes the three biggest sources of
+It doesn't make the model smarter it removes the three biggest sources of
 wasted tokens in a normal chat:
 
 1. Re-pasting code the model can already read from disk
@@ -135,14 +135,14 @@ $F1 = <paste file once>
 ...later...
 FIX $F1#fn:movePiece — off-by-one in loop bound. FMT:snippet
 ```
-The model already has `$F1` in context — you're just pointing at it.
+The model already has `$F1` in context you're just pointing at it.
 
 ---
 
 ## Why this works
 
 - **Code dominates token counts.** `@file` references (when the model has
-  file tools) eliminate re-pasting entirely — usually the single biggest win.
+  file tools) eliminate re-pasting entirely usually the single biggest win.
 - **Output tokens become input tokens next turn.** `FMT:diff`/`FMT:snippet`
   shrink responses, and those savings compound over a long session.
 - **Context repetition is pure waste.** `$VAR`s let you state project context
@@ -154,7 +154,7 @@ The model already has `$F1` in context — you're just pointing at it.
 
 ## Caveats
 
-- This compresses *your* tokens, not the model's reasoning — for genuinely
+- This compresses *your* tokens, not the model's reasoning for genuinely
   novel/ambiguous tasks, don't use `EXPL:0`; give the model room to think.
 - 75% savings is realistic for **iterative coding sessions** with lots of
   repeated file/context. One-shot questions with little redundancy will see
@@ -173,7 +173,7 @@ The model already has `$F1` in context — you're just pointing at it.
 ## Contributing
 
 PRs welcome for: additional intent tags, language-specific abbreviation
-tables, integrations for other tools/agents. Keep the core syntax small —
+tables, integrations for other tools/agents. Keep the core syntax small
 the point is that it's easy to memorize.
 
 ## License
