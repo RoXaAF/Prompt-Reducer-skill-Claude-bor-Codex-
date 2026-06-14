@@ -166,7 +166,7 @@ The model already has `$F1` in context you're just pointing at it.
 
 ## Repo contents
 
-- [`prompt-compression-skill/`](./prompt-compression-skill) — Claude skill
+- [`prompt-compression-skill/`](./SKILL) — Claude skill
   (also packaged as `prompt-compression-skill.skill`) that auto-decodes PCP.
 - [`PCP-protocol.md`](./PCP-protocol.md) — full protocol spec.
 
