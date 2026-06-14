@@ -1,0 +1,149 @@
+# PCP — Prompt Compression Protocol (v1)
+
+A small shorthand syntax for talking to Claude and Codex/ChatGPT that cuts your
+**input** tokens by 40–75% on iterative coding/writing sessions, without
+losing output quality. Works because most wasted tokens come from three
+places: re-pasting code that's already on disk, re-explaining context the
+model already has, and writing full sentences for things that are really just
+flags (explain or not? diff or full file?).
+
+PCP doesn't make the model smarter — it makes your *messages* smaller while
+giving the model the same signal. The model expands the shorthand internally
+and answers as if you'd written the long version.
+
+---
+
+## 1. One-time setup (paste this once per session/project)
+
+Paste this block as your first message (or system/custom-instructions, see
+§5):
+
+```
+[PCP-1] Compression mode on. Rules for this session:
+- @file or @file#L10-40 or @file#fn:name = read/operate on that file/range/function
+  directly (use your file tools); don't ask me to paste it.
+- $NAME=value defines a session variable; $NAME reuses it later.
+- Message prefix sets intent: FIX / ADD / RM / REFAC / OPT / TEST / DOC / ASK / EXPL
+- EXPL:0 = code/diff only, no prose. EXPL:1 = 1-3 sentence explanation. EXPL:2 = full explanation.
+- FMT:diff = unified diff only. FMT:snippet = only the changed function/block. FMT:full = whole file.
+- ~ = same file/scope as my previous message. Δ = "only what changed since last time".
+- Expand all shorthand silently. Don't restate or echo these rules back to me.
+```
+
+That's ~120 tokens, paid once. Everything below assumes this is active.
+
+---
+
+## 2. Tag table (put one at the start of a request)
+
+| Tag | Meaning |
+|---|---|
+| `FIX` | bug fix |
+| `ADD` | new feature/function |
+| `RM` | remove code |
+| `REFAC` | refactor, no behavior change |
+| `OPT` | optimize (perf, memory, etc.) |
+| `TEST` | write/extend tests |
+| `DOC` | docs / report text / comments |
+| `ASK` | question, don't change code |
+| `EXPL` | explain something (no code) |
+
+## 3. Scope syntax (instead of pasting code)
+
+| Syntax | Means |
+|---|---|
+| `@TigerGame.java` | whole file |
+| `@TigerGame.java#L40-90` | line range |
+| `@TigerGame.java#fn:movePiece` | a specific function/method |
+| `~` | "same file/scope as last message" |
+| `$proj`, `$lang`, `$style` | session variables you defined once with `$NAME=...` |
+
+## 4. Output control (instead of "please explain briefly and just show the diff")
+
+| Syntax | Means |
+|---|---|
+| `EXPL:0/1/2` | none / brief / full explanation |
+| `FMT:diff` | unified diff only — biggest output-token saver for edits |
+| `FMT:snippet` | only the changed function, not the whole file |
+| `FMT:full` | whole file (use when starting fresh) |
+| `LANG:zh` / `LANG:en` | language of explanation/report text |
+
+---
+
+## 5. Before / after examples
+
+**Full prompt (~70 tokens):**
+> "Hey, in my TigerGame.java file, in the movePiece method, there's a bug
+> where the Tiger can jump over a Dog even when the three squares aren't in a
+> straight line — the collinearity check isn't working. Can you look at the
+> file, fix it, briefly explain what was wrong, and just show me the fixed
+> method?"
+
+**PCP (~12 tokens):**
+> `FIX @TigerGame.java#fn:movePiece — collinearity check broken for jumps. EXPL:1 FMT:snippet`
+
+That's roughly an 80% drop on this message, and the model gets the same
+information because the file reference replaces the paste.
+
+**Follow-up after a fix (full ~40 tokens vs PCP ~6):**
+> Full: "Okay that looks right, now can you also add a similar check for the
+> Dog's move and just show me the diff, no explanation needed"
+> PCP: `ADD ~ same check for Dog.move FMT:diff EXPL:0`
+
+---
+
+## 6. Where the real savings come from
+
+1. **Never re-paste files the model can already read.** In Claude Code and
+   Codex CLI, `@file` references mean the model reads it itself — this is
+   usually the single biggest saving (code blocks dominate token counts).
+2. **Ask for diffs/snippets, not whole files.** `FMT:diff` / `FMT:snippet`
+   shrinks the model's *output*, which matters because that output becomes
+   part of your context on the next turn too. Savings compound over a long
+   session.
+3. **Define context once with `$VAR`.** Instead of re-explaining "this is for
+   my JS4104HWC Java final project, a Tiger Hunting Game" every message, say
+   `$proj="JS4104HWC Java final – Tiger Hunting Game (Swing, 23-node board)"`
+   once, then just write `$proj`.
+4. **Drop filler.** "Hey, could you possibly..." → nothing. The model doesn't
+   need politeness markers to be polite back.
+5. **Batch related asks into one message.** Three small separate
+   back-and-forths each carry conversational overhead; one message with three
+   tagged lines (`FIX ... / ADD ... / TEST ...`) does it in one shot.
+
+---
+
+## 7. Plain-chat models (Claude.ai web, ChatGPT web — no file access)
+
+You can't use `@file` here since the model can't read your disk. Instead:
+
+- Paste a file **once**, label it: `$F1 = <paste file>`.
+- In later messages, refer to `$F1#fn:name` — the model already has the
+  content in context, so it doesn't need a re-paste, just the pointer.
+- Only re-paste a file if you've changed it *outside* the conversation (e.g.,
+  edited locally) — and even then, paste only the changed function with
+  `FMT:snippet` framing: `$F1#fn:movePiece updated: <snippet>`.
+
+## 8. Making it persistent
+
+- **Claude Code**: put the §1 block into a skill (see the companion
+  `SKILL.md`) — Claude loads it automatically, you don't paste it each time.
+- **Codex CLI / Codex with repos**: drop the §1 block into your repo's
+  `AGENTS.md`. Codex reads that automatically as project instructions.
+- **ChatGPT / Codex web**: paste §1 into "Custom Instructions" once — applies
+  to all future chats.
+- **Claude.ai web**: paste §1 as your first message in a chat, or save it as
+  a personal "Style"/preset if you use one.
+
+---
+
+## 9. Caveats
+
+- PCP shrinks *your* tokens, not the model's reasoning. For genuinely novel
+  or ambiguous tasks, don't use `EXPL:0` — give the model the room it needs.
+- 75% is realistic for **iterative coding sessions** (lots of repeated
+  file/context). For one-shot questions with little reusable context, savings
+  will be smaller (10–30%) — there's just less redundancy to remove.
+- If a model ever seems to misread a tag, just spell it out that one time —
+  PCP is a convention, not a guarantee, and clarity always wins over
+  compression.
